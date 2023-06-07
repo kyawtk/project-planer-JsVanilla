@@ -1,6 +1,8 @@
 import { manageProjects } from "./manageProject";
 import { manageTodos } from "./manageTodos";
-
+import '../styles.css'
+import Todo from "./todo";
+import formatDistance from 'date-fns/formatDistance'
 const UI = (function () {
   // DOM elements
   const projectList = document.getElementById("project-list");
@@ -21,6 +23,7 @@ const UI = (function () {
     const projectInput = document.createElement("input");
     projectInput.required = true;
     projectInput.type = "text";
+    projectInput.maxLength = 20
     projectInput.name = "name";
     projectLabel.appendChild(projectInput);
 
@@ -34,11 +37,10 @@ const UI = (function () {
 
       let myformData = Object.fromEntries(new FormData(e.target).entries());
       console.log(myformData);
-      manageProjects.createProject(myformData.name)
+      manageProjects.createProject(myformData.name);
       projectForm.reset();
-      renderProjectList(manageProjects.getAllProjects())
-      updateProjectSelectList(manageProjects.getAllProjects())
-
+      renderProjectList(manageProjects.getAllProjects());
+      updateProjectSelectList(manageProjects.getAllProjects());
     });
 
     projectForm.appendChild(projectLabel);
@@ -47,10 +49,9 @@ const UI = (function () {
 
     projectList.appendChild(projectFormContainer);
   }
-   
-  function updateProjectSelectList(newListofProjects){
-     
-      const projectSelect = document.querySelector("select[name='project']");
+
+  function updateProjectSelectList(newListofProjects) {
+    const projectSelect = document.querySelector("select[name='project']");
     projectSelect.innerHTML = "";
     for (let project of newListofProjects) {
       const projectOption = document.createElement("option");
@@ -60,27 +61,43 @@ const UI = (function () {
     }
   }
 
-  
   function renderProjectList(projects) {
-    projectList.innerHTML = ""
-    let projectItem = document.createElement("h2");
-    projectItem.classList.add("project-list-item");
+    projectList.innerHTML = "";
+    // let projectItem = document.createElement("h2");
+    // projectItem.classList.add("project-list-item");
+    let activeh3 = null; // Track the currently active h3 element
 
     for (let project of projects) {
-      let h1 = document.createElement("h1");
-      h1.innerText = project.name;
-      h1.classList.add("project-list-item");
+      let h3 = document.createElement("h3");
+      h3.innerText = project.name;
+      h3.classList.add("project-list-item");
 
-      h1.addEventListener("click", () => {
+      h3.addEventListener("click", () => {
+        if (activeh3) {
+          activeh3.classList.remove("active"); // Remove the active class from the previous h3
+        }
         renderProjectTodoList(project);
+        h3.classList.add('active')
+        activeh3 = h3
       });
 
-      projectList.appendChild(h1);
+      let delProject = document.createElement('button')
+      delProject.textContent = "Delete Project"
+      delProject.addEventListener('click',(e)=>{
+        e.stopPropagation()
+        manageProjects.deleteProject(project)
+        renderProjectList(manageProjects.getAllProjects())
+        todoList.innerHTML =" "
+      })
+      h3.appendChild(delProject)
+      projectList.appendChild(h3);
     }
     renderProjectForm();
   }
 
   function renderProjectTodoList(project) {
+
+    let activeItem = null;
     todoList.innerHTML = ``;
 
     let projectName = project.name;
@@ -91,20 +108,25 @@ const UI = (function () {
     todoList.appendChild(h1);
     for (let todo of projectTodos) {
       let todoitem = document.createElement("div");
+      todoitem.classList.add('todo-list-item')
       todoitem.innerHTML = `${todo.title} <button class='delete-btn'>Delete</button>`;
-
+      
       let delbtn = todoitem.querySelector(".delete-btn");
       delbtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        console.log("dele-btn aalled");
+        
         manageTodos.deleteTodo(project, todo);
         renderTodoDetails("");
         renderProjectTodoList(project);
       });
 
       todoitem.addEventListener("click", (e) => {
-        console.log("item is called");
+        if (activeItem) {
+          activeItem.classList.remove("active"); // Remove the active class from the previous h1
+        }
+        activeItem = todoitem
         renderTodoDetails(todo);
+        todoitem.classList.add('active')
       });
       todoList.appendChild(todoitem);
     }
@@ -124,6 +146,8 @@ const UI = (function () {
     titleInput.required = true;
     titleInput.type = "text";
     titleInput.name = "title";
+    titleInput.placeholder = "30Chars max"
+    titleInput.maxLength =30
     titleLabel.appendChild(titleInput);
 
     // Create the description input field
@@ -132,6 +156,7 @@ const UI = (function () {
     const descriptionInput = document.createElement("input");
     descriptionInput.required = true;
     descriptionInput.type = "text";
+    descriptionInput.placeholder = 'Explain the title'
     descriptionInput.name = "description";
     descriptionLabel.appendChild(descriptionInput);
 
@@ -140,6 +165,7 @@ const UI = (function () {
     dueDateLabel.textContent = "Due Date:";
     const dueDateInput = document.createElement("input");
     dueDateInput.type = "date";
+    dueDateInput.required = 'true'
     dueDateInput.name = "dueDate";
     dueDateLabel.appendChild(dueDateInput);
 
@@ -209,16 +235,17 @@ const UI = (function () {
 
     function handleSubmit(e) {
       e.preventDefault();
+
       let myformData = Object.fromEntries(new FormData(e.target).entries());
 
       let [project] = manageProjects
         .getAllProjects()
         .filter((item) => item.name == myformData.project);
       myformData.project = project;
-
+      myformData.dueDate = new Date(myformData.dueDate)
       manageTodos.createTodo(myformData);
       renderProjectTodoList(project);
-      renderTodoForm()
+      renderTodoForm();
       form.reset();
     }
 
@@ -244,14 +271,16 @@ const UI = (function () {
       let { title, description, dueDate, priority, notes } = todo;
       todoDetails.innerHTML = "";
 
-      let titledetail = document.createElement("p");
+      let titledetail = document.createElement("b");
       titledetail.innerText = `Title : ${title}`;
 
       let descriptionDetail = document.createElement("small");
       descriptionDetail.innerText = `Description : ${description}`;
 
       let dueDateDetail = document.createElement("i");
-      dueDateDetail.innerText = `Due Date : ${dueDate}`;
+      let distance = formatDistance(new Date(), dueDate)
+
+      dueDateDetail.innerHTML = `Due Date : ${dueDate}\n <b>Finish in: ${distance}</b>`;
       dueDateDetail.style.display = "block";
 
       let priorityDetail = document.createElement("p");
